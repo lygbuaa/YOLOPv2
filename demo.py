@@ -3,6 +3,7 @@ import time
 from pathlib import Path
 import cv2
 import torch
+import numpy as np
 
 # Conclude setting / general reprocessing / plots / metrices / datasets
 from utils.utils import \
@@ -68,6 +69,7 @@ def detect():
         img = torch.from_numpy(img).to(device)
         img = img.half() if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
+        print("img tensor shape: {}".format(img.shape))
 
         if img.ndimension() == 3:
             img = img.unsqueeze(0)
@@ -90,15 +92,20 @@ def detect():
 
         da_seg_mask = driving_area_mask(seg)
         ll_seg_mask = lane_line_mask(ll)
+        print("da_seg_mask shape: {}, ll_seg_mask shape: {}".format(da_seg_mask.shape, ll_seg_mask.shape))
 
         # Process detections
         for i, det in enumerate(pred):  # detections per image
           
             p, s, im0, frame = path, '', im0s, getattr(dataset, 'frame', 0)
+            print("im0 shape: {}".format(im0.shape))
 
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # img.jpg
             txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # img.txt
+            ll_seg_path = str(save_dir / 'labels' / p.stem) + ".ll.npy"
+            print("save_dir: {}, p.name: {}, p.stem: {}, txt_path: {}, ll_seg_path: {}".format(save_dir, p.name, p.stem, txt_path, ll_seg_path))
+
             s += '%gx%g ' % img.shape[2:]  # print string
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             if len(det):
@@ -121,9 +128,11 @@ def detect():
                     if save_img :  # Add bbox to image
                         plot_one_box(xyxy, im0, line_thickness=3)
 
+            np.save(ll_seg_path, ll_seg_mask)
+
             # Print time (inference)
             print(f'{s}Done. ({t2 - t1:.3f}s)')
-            show_seg_result(im0, (da_seg_mask,ll_seg_mask), is_demo=True)
+            # show_seg_result(im0, (da_seg_mask,ll_seg_mask), is_demo=True)
 
             # Save results (image with detections)
             if save_img:
